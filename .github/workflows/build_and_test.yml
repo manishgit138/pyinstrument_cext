@@ -5,11 +5,15 @@ on: [push, pull_request]
 
 jobs:
   build_wheels:
-    name: Build wheels on ${{ matrix.os }}
+    name: Build wheels on ${{matrix.arch}} for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-18.04, windows-latest, macos-latest]
+        arch: [auto]
+        include:
+           - os: ubuntu-18.04
+             arch: aarch64
 
     steps:
       - uses: actions/checkout@v2
@@ -19,6 +23,10 @@ jobs:
         with:
           python-version: '3.9'
 
+      - uses: docker/setup-qemu-action@v1
+        if: ${{ matrix.arch == 'aarch64' }}
+        name: Set up QEMU
+      
       - name: Install Visual C++ for Python 2.7
         if: runner.os == 'Windows'
         run: |
@@ -27,11 +35,15 @@ jobs:
       - name: Build wheels
         uses: joerick/cibuildwheel@v1.9.0
         env:
+          CIBW_ARCHS_LINUX: ${{matrix.arch}}
           CIBW_SKIP: pp*
           CIBW_ARCHS_MACOS: auto universal2
           CIBW_TEST_REQUIRES: nose
           CIBW_TEST_COMMAND: "nosetests {project}/tests"
 
+      - name: Check wheel
+        run: |
+          ls ./wheelhouse/ 
       - uses: actions/upload-artifact@v2
         with:
           path: ./wheelhouse/*.whl
